@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f85606">
+    <title>{% block title %}Habi Jabi | Everyday finds, delivered{% endblock %}</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --orange: #f85606;
+            --orange-dark: #df4900;
+            --ink: #202124;
+            --muted: #73777f;
+            --line: #eceef1;
+            --surface: #fff;
+            --page: #f5f6f8;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: var(--ink); background: var(--page); }
+        a { color: inherit; text-decoration: none; }
+        button, input, select, textarea { font: inherit; }
+        .topline { background: #f1f2f4; color: #555b64; font-size: 12px; }
+        .topline-inner, .header-inner, .nav-inner, .page-wrap { width: min(1200px, calc(100% - 36px)); margin: 0 auto; }
+        .topline-inner { min-height: 32px; display: flex; align-items: center; justify-content: flex-end; gap: 24px; }
+        .topline a:hover, .nav-inner a:hover { color: var(--orange); }
+        .topline form { display: inline; }
+        .topline button { padding: 0; border: 0; color: inherit; background: none; font-size: inherit; cursor: pointer; }
+        .main-header { background: #fff; }
+        .header-inner { min-height: 82px; display: flex; align-items: center; gap: 28px; }
+        .brand { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; color: var(--orange); font-size: 25px; font-weight: 850; letter-spacing: -1.2px; }
+        .brand-mark { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 12px; background: var(--orange); color: white; font-size: 21px; }
+        .search { height: 42px; display: flex; flex: 1; background: #f4f5f7; border-radius: 8px; overflow: hidden; }
+        .search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; padding: 0 15px; }
+        .search button, .button-primary { border: 0; background: var(--orange); color: white; font-weight: 750; cursor: pointer; }
+        .search button { padding: 0 22px; }
+        .search button:hover, .button-primary:hover { background: var(--orange-dark); }
+        .header-link { white-space: nowrap; font-size: 14px; font-weight: 650; }
+        .cart-link { display: flex; align-items: center; gap: 8px; }
+        .cart-count { min-width: 21px; height: 21px; padding: 0 5px; border-radius: 20px; display: grid; place-items: center; color: white; background: var(--orange); font-size: 12px; }
+        .nav-bar { background: white; border-top: 1px solid #f4f4f4; }
+        .nav-inner { min-height: 42px; display: flex; align-items: center; gap: 28px; color: #555b64; font-size: 13px; }
+        .page-wrap { padding: 24px 0 56px; min-height: calc(100vh - 200px); }
+        .flash { margin-bottom: 18px; padding: 13px 16px; border: 1px solid #bce7cd; border-radius: 8px; background: #edfff3; color: #17653a; }
+        .footer { padding: 30px 18px; background: #252a32; color: #d3d5d9; text-align: center; font-size: 13px; }
+        .footer strong { color: white; }
+        .muted { color: var(--muted); }
+        .panel { background: white; border: 1px solid var(--line); border-radius: 10px; }
+        .button-primary { display: inline-flex; align-items: center; justify-content: center; padding: 11px 16px; border-radius: 7px; }
+        .button-outline { display: inline-flex; align-items: center; justify-content: center; padding: 10px 15px; border: 1px solid var(--orange); border-radius: 7px; color: var(--orange); font-weight: 700; }
+        .page-title { margin: 0 0 18px; font-size: 24px; letter-spacing: -.5px; }
+        @media (max-width: 700px) {
+            .topline-inner, .header-inner, .nav-inner, .page-wrap { width: min(100% - 24px, 1200px); }
+            .header-inner { min-height: 72px; gap: 12px; flex-wrap: wrap; padding: 12px 0; }
+            .brand { font-size: 21px; }
+            .header-link.account-link { display: none; }
+            .search { order: 3; flex-basis: 100%; }
+            .nav-inner { gap: 18px; overflow-x: auto; white-space: nowrap; }
+            .page-wrap { padding-top: 17px; }
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="topline">
+        <div class="topline-inner">
+            {% if current_admin %}
+                <a href="{{ url_for('admin') }}">Admin dashboard</a>
+                <form action="{{ url_for('admin_logout') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit">Admin sign out</button>
+                </form>
+            {% elif current_seller %}
+                <a href="{{ url_for('seller_dashboard') }}">{{ current_seller.store_name }} seller panel</a>
+                <form action="{{ url_for('seller_logout') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit">Seller sign out</button>
+                </form>
+            {% elif current_user %}
+                <a href="{{ url_for('account') }}">Hi, {{ current_user.name }}</a>
+                <form action="{{ url_for('logout') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit">Sign out</button>
+                </form>
+            {% else %}
+                <a href="{{ url_for('seller_login') }}">Seller sign in</a>
+                <a href="{{ url_for('seller_register') }}">Sell on Habi Jabi</a>
+                <a href="{{ url_for('login') }}">Sign in</a>
+                <a href="{{ url_for('register') }}">Join</a>
+            {% endif %}
+        </div>
+    </div>
+    <header class="main-header">
+        <div class="header-inner">
+            <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">h</span><span>habi jabi</span></a>
+            <form class="search" action="{{ url_for('index') }}" method="get" role="search">
+                <input type="search" name="search" value="{{ search|default('') }}" placeholder="Search products, brands and more" aria-label="Search products">
+                <button type="submit">Search</button>
+            </form>
+            <a class="header-link account-link" href="{{ url_for('seller_dashboard') if current_seller else (url_for('account') if current_user else url_for('login')) }}">
+                {{ 'My seller panel' if current_seller else 'My account' }}
+            </a>
+            <a class="header-link cart-link" href="{{ url_for('cart') }}" aria-label="Shopping cart">
+                <span aria-hidden="true">🛒</span><span>Cart</span><span class="cart-count">{{ cart_count }}</span>
+            </a>
+        </div>
+    </header>
+    <nav class="nav-bar" aria-label="Main navigation">
+        <div class="nav-inner">
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('index', category='Electronics') }}">Electronics</a>
+            <a href="{{ url_for('index', category='Fashion') }}">Fashion</a>
+            <a href="{{ url_for('index', category='Home & Living') }}">Home &amp; Living</a>
+            <a href="{{ url_for('index', category='Gadgets') }}">Gadgets</a>
+        </div>
+    </nav>
+    <main class="page-wrap">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}<div class="flash" role="status">{{ message }}</div>{% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="footer"><strong>Habi Jabi</strong> · Good finds for everyday life · Made for shoppers in Bangladesh</footer>
+</body>
+</html>

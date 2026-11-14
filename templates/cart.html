@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Your cart | Habi Jabi{% endblock %}
+{% block head %}
+<style>
+    .cart-layout { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(290px, 1fr); gap: 20px; align-items: start; }
+    .cart-list { display: grid; gap: 12px; }
+    .cart-item { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 15px; }
+    .cart-product { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .cart-image { width: 82px; height: 82px; border-radius: 7px; object-fit: cover; background: #f1f2f4; }
+    .cart-name { margin: 0 0 6px; font-size: 15px; }
+    .cart-price { color: var(--orange); font-weight: 750; }
+    .qty-control { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+    .qty-control form { display: inline-flex; }
+    .qty-control button { width: 29px; height: 29px; display: grid; place-items: center; border: 0; border-radius: 6px; background: #f1f2f4; font-weight: 800; cursor: pointer; }
+    .qty-control button:hover { color: var(--orange); background: #fff2eb; }
+    .qty-control .remove-button { width: auto; margin-left: 6px; color: #ce3030; background: none; font-size: 12px; }
+    .summary { padding: 20px; }
+    .summary h2 { margin: 0 0 16px; padding-bottom: 13px; border-bottom: 1px solid var(--line); font-size: 18px; }
+    .summary-row { display: flex; justify-content: space-between; gap: 12px; margin: 12px 0; color: #555b64; font-size: 14px; }
+    .summary-total { margin-top: 15px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--ink); font-size: 17px; font-weight: 800; }
+    .checkout-form { display: grid; gap: 10px; margin-top: 19px; }
+    .checkout-form input, .checkout-form textarea, .checkout-form select, .admin-form input, .admin-form textarea {
+        width: 100%; padding: 11px 12px; border: 1px solid #dfe1e5; border-radius: 6px; outline: none; background: white;
+    }
+    .checkout-form input:focus, .checkout-form textarea:focus, .checkout-form select:focus, .admin-form input:focus, .admin-form textarea:focus { border-color: var(--orange); }
+    .checkout-form .button-primary { width: 100%; margin-top: 3px; }
+    .empty-cart { padding: 58px 20px; text-align: center; }
+    .empty-cart-icon { font-size: 43px; }
+    .empty-cart h2 { margin: 10px 0 5px; }
+    @media (max-width: 780px) { .cart-layout { grid-template-columns: 1fr; } }
+    @media (max-width: 480px) { .cart-item { align-items: flex-start; flex-direction: column; } .cart-controls { width: 100%; display: flex; justify-content: flex-end; } }
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="page-title">Your shopping cart</h1>
+{% if cart_items %}
+<div class="cart-layout">
+    <div class="cart-list">
+        {% for item in cart_items %}
+        <article class="cart-item panel">
+            <div class="cart-product">
+                <img class="cart-image" src="{{ item.product.image }}" alt="{{ item.product.name }}">
+                <div>
+                    <h2 class="cart-name">{{ item.product.name }}</h2>
+                    <span class="cart-price">৳{{ "%.0f"|format(item.product.price) }}</span>
+                </div>
+            </div>
+            <div class="cart-controls">
+                <div class="qty-control">
+                    <form action="{{ url_for('update_cart', product_id=item.product.id, action='dec') }}" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" aria-label="Decrease quantity">−</button>
+                    </form>
+                    <span>{{ item.qty }}</span>
+                    <form action="{{ url_for('update_cart', product_id=item.product.id, action='inc') }}" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" aria-label="Increase quantity">+</button>
+                    </form>
+                    <form action="{{ url_for('update_cart', product_id=item.product.id, action='remove') }}" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="remove-button" type="submit">Remove</button>
+                    </form>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    <aside class="summary panel">
+        <h2>Order summary</h2>
+        <div class="summary-row"><span>Subtotal</span><span>৳{{ "%.0f"|format(subtotal) }}</span></div>
+        <div class="summary-row"><span>Delivery fee</span><span>৳{{ "%.0f"|format(delivery_fee) }}</span></div>
+        <div class="summary-row summary-total"><span>Total</span><span class="cart-price">৳{{ "%.0f"|format(grand_total) }}</span></div>
+        {% if current_user %}
+            <form action="{{ url_for('checkout') }}" method="post" class="checkout-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="text" name="customer_name" value="{{ current_user.name }}" required placeholder="Full name" aria-label="Full name">
+                <input type="tel" name="phone" value="{{ current_user.phone }}" pattern="01[3-9][0-9]{8}" required placeholder="Phone number (01XXXXXXXXX)" aria-label="Phone number">
+                <textarea name="address" required placeholder="Full delivery address" rows="3" aria-label="Delivery address"></textarea>
+                <select name="payment_method" aria-label="Payment method">
+                    <option value="Cash on Delivery">Cash on delivery (COD)</option>
+                    {% if bkash_configured %}
+                        <option value="bKash">Pay securely with bKash</option>
+                    {% else %}
+                        <option value="bKash" disabled>bKash (merchant setup required)</option>
+                    {% endif %}
+                </select>
+                <button type="submit" class="button-primary">Place your order</button>
+            </form>
+        {% else %}
+            <div class="checkout-form">
+                <p class="muted">Sign in or create an account to save your order and track delivery.</p>
+                <a class="button-primary" href="{{ url_for('login', next=url_for('cart')) }}">Sign in to checkout</a>
+                <a class="button-outline" href="{{ url_for('register') }}">Create customer account</a>
+            </div>
+        {% endif %}
+    </aside>
+</div>
+{% else %}
+<section class="empty-cart panel">
+    <div class="empty-cart-icon" aria-hidden="true">🛒</div>
+    <h2>Your cart is waiting for something good</h2>
+    <p class="muted">Explore our latest finds and add your favorites.</p>
+    <a class="button-primary" href="{{ url_for('index') }}">Start shopping</a>
+</section>
+{% endif %}
+{% endblock %}

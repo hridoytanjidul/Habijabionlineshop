@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ current_seller.store_name }} seller panel | Habi Jabi{% endblock %}
+{% block head %}
+<style>
+    .seller-heading { display: flex; justify-content: space-between; align-items: end; gap: 14px; margin-bottom: 18px; }
+    .seller-heading h1 { margin: 0; font-size: 24px; }
+    .seller-layout { display: grid; grid-template-columns: minmax(270px, .75fr) minmax(0, 1.6fr); gap: 18px; align-items: start; }
+    .seller-panel { padding: 19px; }
+    .seller-panel h2 { margin: 0 0 15px; font-size: 18px; }
+    .seller-form { display: grid; gap: 10px; }
+    .seller-form input, .seller-form textarea { width: 100%; padding: 11px 12px; border: 1px solid #dfe1e5; border-radius: 6px; background: #fff; }
+    .seller-form .button-primary { width: 100%; }
+    .seller-table-wrap { overflow-x: auto; }
+    .seller-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .seller-table th, .seller-table td { padding: 11px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+    .seller-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+    .seller-image { width: 46px; height: 46px; border-radius: 6px; object-fit: cover; background: #f1f2f4; }
+    .seller-actions { display: flex; align-items: center; gap: 10px; }
+    .delete-button { border: 0; color: #c53737; background: transparent; cursor: pointer; font-weight: 700; }
+    @media (max-width: 820px) { .seller-layout { grid-template-columns: 1fr; } }
+    @media (max-width: 550px) { .seller-heading { align-items: flex-start; flex-direction: column; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="seller-heading">
+    <div>
+        <h1>{{ current_seller.store_name }} seller panel</h1>
+        <p class="muted" style="margin:5px 0 0">{{ products|length }} active product listing{% if products|length != 1 %}s{% endif %}</p>
+    </div>
+    <a class="button-outline" href="{{ url_for('index') }}">View marketplace</a>
+</div>
+<div class="seller-layout">
+    <section class="seller-panel panel">
+        <h2>Add a product for sale</h2>
+        <form class="seller-form" method="post" action="{{ url_for('seller_dashboard') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="name" required maxlength="160" placeholder="Product name">
+            <input type="text" name="category" required maxlength="80" placeholder="Category">
+            <input type="number" name="price" min="0.01" step="0.01" required placeholder="Price (৳)">
+            <input type="number" name="old_price" min="0" step="0.01" placeholder="Old price (optional)">
+            <input type="url" name="image" placeholder="Product image URL (optional)">
+            <textarea name="description" rows="3" maxlength="1000" placeholder="Product description"></textarea>
+            <button class="button-primary" type="submit">Publish product</button>
+        </form>
+    </section>
+    <section class="seller-panel panel">
+        <h2>Your listings</h2>
+        <div class="seller-table-wrap">
+            <table class="seller-table">
+                <thead><tr><th>Image</th><th>Product</th><th>Category</th><th>Price</th><th>Actions</th></tr></thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td><img class="seller-image" src="{{ product.image }}" alt=""></td>
+                        <td>{{ product.name }}</td>
+                        <td>{{ product.category }}</td>
+                        <td>৳{{ "%.0f"|format(product.price) }}</td>
+                        <td>
+                            <div class="seller-actions">
+                                <a href="{{ url_for('seller_edit_product', product_id=product.id) }}">Edit</a>
+                                <form method="post" action="{{ url_for('seller_delete_product', product_id=product.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="delete-button" type="submit">Remove</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="muted">Your published products will appear here.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

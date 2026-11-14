@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Create an account | Habi Jabi{% endblock %}
+{% block head %}
+<style>
+    .auth-card { width: min(470px, 100%); margin: 22px auto; padding: 26px; }
+    .auth-card h1 { margin: 0 0 7px; font-size: 23px; }
+    .auth-card > p { margin: 0 0 20px; }
+    .auth-form { display: grid; gap: 12px; }
+    .auth-form input { width: 100%; padding: 12px; border: 1px solid #dfe1e5; border-radius: 6px; }
+    .auth-form input:focus { outline: 1px solid var(--orange); border-color: var(--orange); }
+    .auth-form .button-primary { width: 100%; }
+</style>
+{% endblock %}
+{% block content %}
+<section class="auth-card panel">
+    <h1>Create your customer account</h1>
+    <p class="muted">Keep your orders together and track delivery from one place.</p>
+    <form class="auth-form" method="post" action="{{ url_for('register') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="text" name="name" autocomplete="name" required maxlength="120" placeholder="Full name">
+        <input type="email" name="email" autocomplete="email" required placeholder="Email address">
+        <input type="tel" name="phone" autocomplete="tel" pattern="01[3-9][0-9]{8}" required placeholder="Bangladesh mobile (01XXXXXXXXX)">
+        <input type="password" name="password" autocomplete="new-password" minlength="8" required placeholder="Password (at least 8 characters)">
+        <button class="button-primary" type="submit">Create account</button>
+    </form>
+    <p class="muted" style="margin:18px 0 0">Already registered? <a href="{{ url_for('login') }}" style="color:var(--orange);font-weight:700">Sign in</a></p>
+</section>
+{% endblock %}

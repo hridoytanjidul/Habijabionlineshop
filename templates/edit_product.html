@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Edit product | Habi Jabi{% endblock %}
+{% block head %}
+<style>
+    .edit-card { width: min(620px, 100%); margin: 0 auto; padding: 21px; }
+    .edit-card h1 { margin: 0 0 18px; font-size: 22px; }
+    .admin-form { display: grid; gap: 11px; }
+    .admin-form input, .admin-form textarea { width: 100%; padding: 11px 12px; border: 1px solid #dfe1e5; border-radius: 6px; }
+    .admin-form .button-primary { width: 100%; }
+</style>
+{% endblock %}
+{% block content %}
+<section class="edit-card panel">
+    <h1>Edit product</h1>
+    <form class="admin-form" method="post" action="{{ url_for('edit_product', product_id=product.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="text" name="name" value="{{ product.name }}" required placeholder="Product name">
+        <input type="text" name="category" value="{{ product.category }}" required placeholder="Category">
+        <input type="number" name="price" value="{{ product.price }}" min="0.01" step="0.01" required placeholder="Price (৳)">
+        <input type="number" name="old_price" value="{{ product.old_price or '' }}" min="0" step="0.01" placeholder="Old price (optional)">
+        <input type="url" name="image" value="{{ product.image }}" placeholder="Image URL">
+        <textarea name="description" rows="4" placeholder="Short product description">{{ product.description or '' }}</textarea>
+        <button class="button-primary" type="submit">Save changes</button>
+        <a class="button-outline" href="{{ url_for('admin') }}">Cancel</a>
+    </form>
+</section>
+{% endblock %}

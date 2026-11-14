@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Store management | Habi Jabi{% endblock %}
+{% block head %}
+<style>
+    .admin-grid { display: grid; grid-template-columns: minmax(280px, .75fr) minmax(0, 1.5fr); gap: 18px; align-items: start; }
+    .admin-panel { padding: 19px; }
+    .admin-panel h2 { margin: 0 0 15px; font-size: 18px; }
+    .admin-form { display: grid; gap: 10px; }
+    .admin-form .button-primary { width: 100%; }
+    .table-wrap { overflow-x: auto; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th, .data-table td { padding: 11px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+    .data-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+    .data-table td:first-child { min-width: 150px; }
+    .delete-button { border: 0; color: #c53737; background: transparent; cursor: pointer; font-weight: 700; }
+    .orders-section { margin-top: 20px; }
+    @media (max-width: 800px) { .admin-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="page-title">Admin dashboard</h1>
+<div class="admin-grid">
+    <section class="admin-panel panel">
+        <h2>Add a product</h2>
+        <form class="admin-form" method="post" action="{{ url_for('admin') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="name" required placeholder="Product name">
+            <input type="text" name="category" required placeholder="Category">
+            <input type="number" name="price" min="0.01" step="0.01" required placeholder="Price (৳)">
+            <input type="number" name="old_price" min="0" step="0.01" placeholder="Old price (optional)">
+            <input type="url" name="image" placeholder="Image URL (optional)">
+            <textarea name="description" rows="3" placeholder="Short product description"></textarea>
+            <button class="button-primary" type="submit">Add product</button>
+        </form>
+    </section>
+    <section class="admin-panel panel">
+        <h2>Products <span class="muted">({{ products|length }})</span></h2>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Product</th><th>Category</th><th>Seller</th><th>Price</th><th></th></tr></thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td>{{ product.name }}</td><td>{{ product.category }}</td>
+                        <td>{{ product.seller_name or 'Habi Jabi' }}</td><td>৳{{ "%.0f"|format(product.price) }}</td>
+                        <td>
+                            <a class="muted" href="{{ url_for('edit_product', product_id=product.id) }}">Edit</a>
+                            <form method="post" action="{{ url_for('delete_product', product_id=product.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="delete-button" type="submit">Delete</button></form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="muted">No products in the catalog.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+<section class="admin-panel panel orders-section">
+    <h2>Recent orders <span class="muted">({{ orders|length }})</span></h2>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Payment</th><th>Delivery</th><th>Total</th><th>Date</th></tr></thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>#{{ order.id }}</td><td>{{ order.customer_name }}<br><span class="muted">{{ order.phone }}</span><br><span class="muted">{{ order.address }}</span></td>
+                    <td>{{ order.items }}</td>
+                    <td>
+                        {{ order.payment_method }}
+                        {% if order.payment_method == 'Cash on Delivery' %}
+                            <form method="post" action="{{ url_for('update_cod_payment_status', order_id=order.id) }}" class="admin-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <select name="payment_status" aria-label="Payment status for order {{ order.id }}">
+                                    {% for payment_status in ['Due', 'Paid'] %}
+                                        <option value="{{ payment_status }}" {{ 'selected' if order.payment_status == payment_status else '' }}>{{ payment_status }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="button-outline" type="submit">Update payment</button>
+                            </form>
+                        {% else %}
+                            <br><span class="muted">{{ order.payment_status }}{% if order.bkash_trx_id %} · {{ order.bkash_trx_id }}{% endif %}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="post" action="{{ url_for('update_order_status', order_id=order.id) }}" class="admin-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <select name="status" aria-label="Delivery status for order {{ order.id }}">
+                                {% for status in ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'] %}
+                                    <option value="{{ status }}" {{ 'selected' if order.status == status else '' }}>{{ status }}</option>
+                                {% endfor %}
+                            </select>
+                            <button class="button-outline" type="submit">Update</button>
+                        </form>
+                    </td>
+                    <td>৳{{ "%.0f"|format(order.total_amount) }}</td><td>{{ order.created_at }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="muted">Orders will appear here after checkout.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+<section class="admin-panel panel orders-section">
+    <h2>Customer accounts <span class="muted">({{ users|length }})</span></h2>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th></tr></thead>
+            <tbody>
+                {% for user in users %}
+                <tr><td>{{ user.name }}</td><td>{{ user.email }}</td><td>{{ user.phone }}</td><td>{{ user.created_at }}</td></tr>
+                {% else %}
+                <tr><td colspan="4" class="muted">Customer accounts will appear here after registration.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+<section class="admin-panel panel orders-section">
+    <h2>Seller accounts <span class="muted">({{ sellers|length }})</span></h2>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Store</th><th>Seller</th><th>Email</th><th>Phone</th><th>Joined</th></tr></thead>
+            <tbody>
+                {% for seller in sellers %}
+                <tr><td>{{ seller.store_name }}</td><td>{{ seller.name }}</td><td>{{ seller.email }}</td><td>{{ seller.phone }}</td><td>{{ seller.created_at }}</td></tr>
+                {% else %}
+                <tr><td colspan="5" class="muted">Seller accounts will appear here after registration.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

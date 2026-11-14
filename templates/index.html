@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Habi Jabi | Shop everyday essentials{% endblock %}
+{% block head %}
+<style>
+    .hero { min-height: 245px; padding: 34px 42px; display: flex; align-items: center; justify-content: space-between; gap: 22px; overflow: hidden; border-radius: 12px; color: white; background: linear-gradient(110deg, #ed4e13, #ff8a28); }
+    .hero-copy { max-width: 570px; }
+    .hero-kicker { margin: 0 0 10px; text-transform: uppercase; letter-spacing: 1.5px; font-size: 12px; font-weight: 800; opacity: .9; }
+    .hero h1 { margin: 0; font-size: clamp(29px, 4vw, 44px); line-height: 1.1; letter-spacing: -1.3px; }
+    .hero p { margin: 12px 0 20px; color: #fff2e9; }
+    .hero .button { display: inline-block; padding: 11px 17px; border-radius: 7px; color: #db4a0b; background: #fff; font-weight: 800; }
+    .hero-art { width: 190px; height: 190px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid #ffffff50; border-radius: 50%; background: #ffffff18; font-size: 94px; transform: rotate(-8deg); }
+    .benefits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0 25px; }
+    .benefit { display: flex; align-items: center; gap: 12px; padding: 15px; background: white; border: 1px solid var(--line); border-radius: 9px; }
+    .benefit-icon { font-size: 23px; }
+    .benefit strong { display: block; font-size: 13px; }
+    .benefit span:last-child { color: var(--muted); font-size: 12px; }
+    .catalog { display: grid; grid-template-columns: 215px minmax(0, 1fr); align-items: start; gap: 18px; }
+    .category-box { padding: 17px; }
+    .category-box h2 { margin: 0 0 12px; font-size: 15px; }
+    .category-list { display: grid; gap: 3px; }
+    .category-list a { padding: 9px 10px; border-radius: 6px; color: #565b62; font-size: 13px; }
+    .category-list a:hover, .category-list a.active { color: var(--orange); background: #fff2eb; font-weight: 700; }
+    .products-head { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin: 0 0 13px; }
+    .products-head h2 { margin: 0; font-size: 20px; }
+    .products-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .product-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; }
+    .product-card { min-width: 0; overflow: hidden; background: white; border: 1px solid var(--line); border-radius: 9px; transition: box-shadow .15s, transform .15s; }
+    .product-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px #20212414; }
+    .product-image { width: 100%; aspect-ratio: 1 / .86; display: block; object-fit: cover; background: #f2f3f5; }
+    .product-info { padding: 12px; }
+    .product-category { color: var(--muted); font-size: 11px; }
+    .product-seller { margin-top: 6px; color: var(--muted); font-size: 11px; }
+    .product-name { min-height: 38px; margin: 5px 0 8px; display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 13px; line-height: 1.45; }
+    .product-price { color: var(--orange); font-size: 18px; font-weight: 800; }
+    .product-old { margin-left: 5px; color: #9a9da3; font-size: 12px; text-decoration: line-through; }
+    .product-desc { min-height: 34px; margin: 7px 0 11px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .add-button { width: 100%; padding: 9px 8px; border: 0; border-radius: 6px; color: white; background: var(--orange); font-size: 12px; font-weight: 750; cursor: pointer; }
+    .add-button:hover { background: var(--orange-dark); }
+    .empty-results { padding: 45px 20px; text-align: center; }
+    .empty-results h3 { margin: 0 0 7px; }
+    @media (max-width: 950px) { .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 700px) {
+        .hero { min-height: 205px; padding: 25px; }
+        .hero-art { width: 100px; height: 100px; font-size: 52px; }
+        .benefits { grid-template-columns: 1fr; gap: 8px; }
+        .benefit { padding: 11px 14px; }
+        .catalog { grid-template-columns: 1fr; }
+        .category-box { padding: 12px; }
+        .category-list { display: flex; overflow-x: auto; }
+        .category-list a { white-space: nowrap; }
+        .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+        .product-info { padding: 10px; }
+        .product-name { font-size: 12px; }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<section class="hero">
+    <div class="hero-copy">
+        <p class="hero-kicker">The everyday edit</p>
+        <h1>Little things.<br>Big happy.</h1>
+        <p>Discover great picks for your home, style and everyday life.</p>
+        <a class="button" href="#products">Shop the collection</a>
+    </div>
+    <div class="hero-art" aria-hidden="true">🛍️</div>
+</section>
+<section class="benefits" aria-label="Shopping benefits">
+    <div class="benefit"><span class="benefit-icon">🚚</span><span><strong>Delivery across Bangladesh</strong><span>We bring your finds to your door</span></span></div>
+    <div class="benefit"><span class="benefit-icon">💳</span><span><strong>Pay your way</strong><span>Cash on delivery and mobile payments</span></span></div>
+    <div class="benefit"><span class="benefit-icon">✨</span><span><strong>Fresh finds, fair prices</strong><span>Something good for every day</span></span></div>
+</section>
+<section class="catalog" id="products">
+    <aside class="category-box panel">
+        <h2>Shop by category</h2>
+        <div class="category-list">
+            <a class="{{ 'active' if selected_category == 'All' else '' }}" href="{{ url_for('index', search=search) }}">All products</a>
+            {% for category in categories %}
+            <a class="{{ 'active' if selected_category == category else '' }}" href="{{ url_for('index', category=category, search=search) }}">{{ category }}</a>
+            {% endfor %}
+        </div>
+    </aside>
+    <div>
+        <div class="products-head">
+            <div>
+                <h2>{% if search %}Search results{% elif selected_category != 'All' %}{{ selected_category }}{% else %}Popular right now{% endif %}</h2>
+                <p>{{ products|length }} products to explore</p>
+            </div>
+            {% if search %}<a class="muted" href="{{ url_for('index') }}" style="font-size:13px">Clear search</a>{% endif %}
+        </div>
+        {% if products %}
+        <div class="product-grid">
+            {% for product in products %}
+            <article class="product-card">
+                <img class="product-image" src="{{ product.image }}" alt="{{ product.name }}" loading="lazy">
+                <div class="product-info">
+                    <span class="product-category">{{ product.category }}</span>
+                    <h3 class="product-name">{{ product.name }}</h3>
+                    <div><span class="product-price">৳{{ "%.0f"|format(product.price) }}</span>{% if product.old_price %}<span class="product-old">৳{{ "%.0f"|format(product.old_price) }}</span>{% endif %}</div>
+                    <p class="product-seller">Sold by {{ product.seller_name or 'Habi Jabi' }}</p>
+                    <p class="product-desc">{{ product.description or 'A thoughtful pick for your everyday.' }}</p>
+                    <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="add-button" type="submit">Add to cart</button>
+                    </form>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-results panel">
+            <h3>No products found</h3>
+            <p class="muted">Try another search or browse all of our finds.</p>
+            <a class="button-primary" href="{{ url_for('index') }}">Browse all products</a>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
