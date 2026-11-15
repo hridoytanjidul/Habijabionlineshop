@@ -125,7 +125,9 @@ class StoreAccountTests(unittest.TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         conn = store.get_db()
-        product_count = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+        product_count = conn.execute(
+            "SELECT COUNT(*) AS product_count FROM products"
+        ).fetchone()["product_count"]
         conn.close()
         self.assertGreaterEqual(product_count, 100)
 
@@ -320,7 +322,9 @@ class StoreAccountTests(unittest.TestCase):
                 ).fetchone()
                 self.assertIsNone(product["seller_id"])
                 self.assertGreaterEqual(
-                    conn.execute("SELECT COUNT(*) FROM products").fetchone()[0],
+                    conn.execute(
+                        "SELECT COUNT(*) AS product_count FROM products"
+                    ).fetchone()["product_count"],
                     100,
                 )
                 conn.close()

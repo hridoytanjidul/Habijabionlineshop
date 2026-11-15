@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: habi_jabi
+      POSTGRES_USER: habi_jabi
+      POSTGRES_PASSWORD: local-docker-password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U habi_jabi -d habi_jabi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.vercel
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://habi_jabi:local-docker-password@db:5432/habi_jabi
+      SECRET_KEY: local-docker-secret-key-not-for-production
+      ADMIN_EMAIL: admin@example.test
+      ADMIN_PASSWORD: local-admin-password
+      COOKIE_SECURE: "false"
+      PORT: "5000"
+    ports:
+      - "127.0.0.1:5000:5000"
+
+volumes:
+  postgres_data:

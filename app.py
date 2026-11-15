@@ -8,16 +8,32 @@ import time
 from functools import wraps
 from urllib.parse import urlparse
 
+import psycopg
 import requests
 from flask import Flask, abort, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+IS_VERCEL = os.environ.get("VERCEL") == "1"
+if IS_VERCEL and not DATABASE_URL:
+    raise RuntimeError("Set DATABASE_URL to a persistent PostgreSQL database on Vercel.")
+
+secret_key = os.environ.get("SECRET_KEY")
+if IS_VERCEL and not secret_key:
+    raise RuntimeError("Set SECRET_KEY in the Vercel project environment.")
+if IS_VERCEL and not (
+    os.environ.get("ADMIN_EMAIL", "").strip() and os.environ.get("ADMIN_PASSWORD")
+):
+    raise RuntimeError("Set ADMIN_EMAIL and ADMIN_PASSWORD in the Vercel project environment.")
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
+app.secret_key = secret_key or os.urandom(32)
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "").lower() == "true",
+    SESSION_COOKIE_SECURE=os.environ.get(
+        "COOKIE_SECURE", "true" if IS_VERCEL else "false"
+    ).lower() == "true",
     BKASH_BASE_URL=os.environ.get(
         "BKASH_BASE_URL",
         "https://tokenized.sandbox.bka.sh/v2/tokenized-checkout",
@@ -32,11 +48,88 @@ class BkashError(Exception):
     pass
 
 
+class DatabaseConnection:
+    def __init__(self):
+        self.is_postgres = bool(DATABASE_URL)
+        if self.is_postgres:
+            self.connection = psycopg.connect(DATABASE_URL)
+        else:
+            self.connection = sqlite3.connect(DB_NAME)
+            self.connection.row_factory = sqlite3.Row
+            self.connection.execute("PRAGMA foreign_keys = ON")
+
+    def execute(self, query, params=None):
+        if self.is_postgres:
+            query = query.replace("?", "%s")
+        if params is None:
+            cursor = self.connection.execute(query)
+        else:
+            cursor = self.connection.execute(query, params)
+        return DatabaseResult(cursor, self.is_postgres)
+
+    def executemany(self, query, params):
+        if self.is_postgres:
+            query = query.replace("?", "%s")
+        cursor = self.connection.cursor()
+        cursor.executemany(query, params)
+        return DatabaseResult(cursor, self.is_postgres)
+
+    def commit(self):
+        self.connection.commit()
+
+    def close(self):
+        self.connection.close()
+
+
+class DatabaseResult:
+    def __init__(self, cursor, is_postgres):
+        self.cursor = cursor
+        self.is_postgres = is_postgres
+
+    def _as_dict(self, row):
+        if row is None:
+            return None
+        if not self.is_postgres:
+            return dict(row)
+        columns = [column.name for column in self.cursor.description]
+        return dict(zip(columns, row))
+
+    def fetchone(self):
+        return self._as_dict(self.cursor.fetchone())
+
+    def fetchall(self):
+        rows = []
+        for row in self.cursor.fetchall():
+            mapped_row = self._as_dict(row)
+            if mapped_row is not None:
+                rows.append(mapped_row)
+        return rows
+
+    def fetchone_required(self):
+        row = self.fetchone()
+        if row is None:
+            raise RuntimeError("Expected a database row, but the query returned none.")
+        return row
+
+    @property
+    def rowcount(self):
+        return self.cursor.rowcount
+
+
 def get_db():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    return DatabaseConnection()
+
+
+def get_table_columns(conn, table):
+    if DATABASE_URL:
+        rows = conn.execute(
+            """SELECT column_name FROM information_schema.columns
+               WHERE table_schema = current_schema() AND table_name = ?""",
+            (table,),
+        ).fetchall()
+        return {row["column_name"] for row in rows}
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return {row["name"] for row in rows}
 
 
 def marketplace_seed_products():
@@ -244,10 +337,18 @@ def marketplace_seed_products():
 
 def init_db():
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("""
+    cursor = conn
+    if DATABASE_URL:
+        cursor.execute("SELECT pg_advisory_xact_lock(710241)")
+    id_primary_key = (
+        "SERIAL PRIMARY KEY"
+        if DATABASE_URL
+        else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    )
+    price_type = "DOUBLE PRECISION" if DATABASE_URL else "REAL"
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS sellers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {id_primary_key},
             name TEXT NOT NULL,
             store_name TEXT NOT NULL UNIQUE,
             email TEXT NOT NULL UNIQUE,
@@ -256,31 +357,33 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    cursor.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_sellers_store_name_nocase ON sellers(store_name COLLATE NOCASE)"
+    store_name_index = (
+        "LOWER(store_name)" if DATABASE_URL else "store_name COLLATE NOCASE"
     )
-    cursor.execute("""
+    cursor.execute(
+        f"CREATE UNIQUE INDEX IF NOT EXISTS idx_sellers_store_name_nocase ON sellers({store_name_index})"
+    )
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {id_primary_key},
             name TEXT NOT NULL,
             category TEXT NOT NULL,
-            price REAL NOT NULL,
-            old_price REAL,
+            price {price_type} NOT NULL,
+            old_price {price_type},
             image TEXT NOT NULL,
-            description TEXT
+            description TEXT,
+            seller_id INTEGER REFERENCES sellers(id)
         )
     """)
-    product_columns = {
-        row["name"] for row in cursor.execute("PRAGMA table_info(products)").fetchall()
-    }
+    product_columns = get_table_columns(conn, "products")
     if "seller_id" not in product_columns:
         cursor.execute(
             "ALTER TABLE products ADD COLUMN seller_id INTEGER REFERENCES sellers(id)"
         )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_seller_id ON products(seller_id)")
-    cursor.execute("""
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {id_primary_key},
             name TEXT NOT NULL,
             email TEXT NOT NULL UNIQUE,
             phone TEXT NOT NULL,
@@ -288,23 +391,23 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    cursor.execute("""
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS admins (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {id_primary_key},
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    cursor.execute("""
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {id_primary_key},
             user_id INTEGER REFERENCES users(id),
             customer_name TEXT NOT NULL,
             phone TEXT NOT NULL,
             address TEXT NOT NULL,
             payment_method TEXT NOT NULL,
-            total_amount REAL NOT NULL,
+            total_amount {price_type} NOT NULL,
             items TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'Pending',
             payment_status TEXT NOT NULL DEFAULT 'Due',
@@ -313,9 +416,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    existing_columns = {
-        row["name"] for row in cursor.execute("PRAGMA table_info(orders)").fetchall()
-    }
+    existing_columns = get_table_columns(conn, "orders")
     order_migrations = {
         "user_id": "INTEGER REFERENCES users(id)",
         "status": "TEXT NOT NULL DEFAULT 'Pending'",
@@ -335,7 +436,9 @@ def init_db():
         )
     """)
 
-    product_count = cursor.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+    product_count = cursor.execute(
+        "SELECT COUNT(*) AS product_count FROM products"
+    ).fetchone_required()["product_count"]
     if product_count == 0:
         sample_products = [
             ("Wireless ANC Headphones", "Electronics", 2450, 3200, "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80", "Deep bass, 30-hour battery life, and active noise cancellation."),
@@ -372,7 +475,8 @@ def init_db():
     admin_password = os.environ.get("ADMIN_PASSWORD", "")
     if admin_email and admin_password:
         cursor.execute(
-            "INSERT OR IGNORE INTO admins (email, password_hash) VALUES (?, ?)",
+            """INSERT INTO admins (email, password_hash) VALUES (?, ?)
+               ON CONFLICT(email) DO NOTHING""",
             (admin_email, generate_password_hash(admin_password, method="pbkdf2:sha256")),
         )
     elif admin_email or admin_password:
@@ -651,7 +755,7 @@ def index():
                WHERE 1=1"""
     params = []
     if search:
-        query += " AND (name LIKE ? OR description LIKE ?)"
+        query += " AND (LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?))"
         params.extend([f"%{search}%", f"%{search}%"])
     if category and category != "All":
         query += " AND category = ?"
@@ -692,15 +796,16 @@ def register():
         conn = get_db()
         try:
             cursor = conn.execute(
-                "INSERT INTO users (name, email, phone, password_hash) VALUES (?, ?, ?, ?)",
+                """INSERT INTO users (name, email, phone, password_hash)
+                   VALUES (?, ?, ?, ?) RETURNING id""",
                 (name, email, phone, generate_password_hash(password, method="pbkdf2:sha256")),
             )
+            user_id = cursor.fetchone_required()["id"]
             conn.commit()
-        except sqlite3.IntegrityError:
+        except (sqlite3.IntegrityError, psycopg.IntegrityError):
             conn.close()
             flash("An account with that email already exists.")
             return render_template("register.html")
-        user_id = cursor.lastrowid
         conn.close()
         saved_cart = session.get("cart", {})
         session.clear()
@@ -734,7 +839,7 @@ def seller_register():
         try:
             cursor = conn.execute(
                 """INSERT INTO sellers (name, store_name, email, phone, password_hash)
-                   VALUES (?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?) RETURNING id""",
                 (
                     name,
                     store_name,
@@ -743,12 +848,12 @@ def seller_register():
                     generate_password_hash(password, method="pbkdf2:sha256"),
                 ),
             )
+            seller_id = cursor.fetchone_required()["id"]
             conn.commit()
-        except sqlite3.IntegrityError:
+        except (sqlite3.IntegrityError, psycopg.IntegrityError):
             conn.close()
             flash("That seller email or store name is already registered.")
             return render_template("seller_register.html")
-        seller_id = cursor.lastrowid
         conn.close()
         session.clear()
         session["seller_id"] = seller_id
@@ -848,7 +953,7 @@ def update_profile():
             (name, email, phone, g.current_user["id"]),
         )
         conn.commit()
-    except sqlite3.IntegrityError:
+    except (sqlite3.IntegrityError, psycopg.IntegrityError):
         conn.close()
         flash("That email address is already associated with another account.")
         return redirect(url_for("account"))
@@ -963,7 +1068,7 @@ def checkout():
     cursor = conn.execute(
         """INSERT INTO orders
            (user_id, customer_name, phone, address, payment_method, total_amount, items, payment_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
         (
             g.current_user["id"],
             customer_name,
@@ -975,7 +1080,7 @@ def checkout():
             payment_status,
         ),
     )
-    order_id = cursor.lastrowid
+    order_id = cursor.fetchone_required()["id"]
     conn.commit()
     if payment_method == "Cash on Delivery":
         conn.close()
